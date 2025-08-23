@@ -229,9 +229,11 @@ def build_name_from_kv(kv: dict) -> str:
         parts.append(simplify_cpu(cpu_raw))
 
 
-    # 3) RAM (Memory)
-    ram = _get(kv, "Memory", "RAM", "DIMM Memory","System Memory", "On board memory")
-    if ram: parts.append(ram)
+    # 3) RAM
+    ram_raw = _get(kv, "Memory", "RAM", "System Memory", "Installed Memory", "DIMM Memory")
+    if ram_raw:
+        parts.append(simplify_ram(ram_raw))
+
 
     # 4) SSD
     ssd = _get(kv, "SSD")
@@ -340,6 +342,7 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
 
 
 
