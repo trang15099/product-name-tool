@@ -74,6 +74,28 @@ def _normalize_resolution(res: str) -> str:
     mapped = RESOLUTION_MAP.get(s.lower(), "")
     return mapped if mapped else raw
 
+def simplify_cpu(text: str) -> str:
+    t = text.replace("®", "").replace("™", "").strip()
+
+    # Rule 1: Core i3/i5/i7/i9
+    m = re.search(r"(i[3579]-\d+[A-Za-z0-9]*)", t)
+    if m:
+        return m.group(1)
+
+    # Rule 2: Core Ultra
+    m2 = re.search(r"Ultra\s*(\d+)\s*([0-9]{3}[A-Za-z0-9]*)", t, re.I)
+    if m2:
+        return f"Ultra {m2.group(1)}-{m2.group(2)}"
+
+    # Rule 3: Core (chỉ số thế hệ, không có i, không Ultra)
+    m3 = re.search(r"Core\s+(\d+)\s*Processor\s*([0-9]{3}[A-Za-z0-9]*)", t, re.I)
+    if m3:
+        return f"Core {m3.group(1)}-{m3.group(2)}"
+
+    # fallback: giữ nguyên
+    return t
+
+
 def _wifi_code(wireless: str) -> str:
     t = _to_str(wireless).upper()
     if not t:
@@ -164,13 +186,14 @@ def build_name_from_kv(kv: dict) -> str:
     parts.append(model)
 
     # 2) CPU
-    cpu = ""
+    cpu_raw = ""
     for k, v in kv.items():
-        if "processor" in k:   # match cả "On board processor", "Processor"
-            cpu = v
+        if "processor" in k:   # match bất kỳ key chứa chữ processor
+            cpu_raw = v
             break
-    if cpu:
-        parts.append(cpu)
+    if cpu_raw:
+        parts.append(simplify_cpu(cpu_raw))
+
 
     # 3) RAM (Memory)
     ram = _get(kv, "Memory", "RAM")
@@ -283,4 +306,5 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
 
