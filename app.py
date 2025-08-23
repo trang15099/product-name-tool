@@ -1,5 +1,5 @@
 # app.py
-# Streamlit tool tạo tên sản phẩm từ specsheet Excel dạng 2 cột (Key | Value)
+# Streamlit: tạo tên sản phẩm từ specsheet Excel dạng 2 cột (Key | Value)
 # Yêu cầu: streamlit, pandas, openpyxl, xlsxwriter
 
 import streamlit as st
@@ -143,9 +143,14 @@ def _warranty_code(w_text: str) -> str:
 # Core build logic
 # =========================
 def build_name_from_kv(kv: dict) -> str:
+    """
+    Thứ tự cố định:
+    Model + CPU + RAM + SSD + HDD(if) + TPM + Display + T(if) + CAM(if) + MIC(if) + WF(if) + BT(if)
+    + KB&M(if) + Windows(mandatory, NOS if missing) + Warranty(if) + Color(if) + (Sales Model or Sales Model Name)
+    """
     parts = []
 
-    # 1) Model — lấy phần trước dấu '-' của "Sales Model Name" (bắt buộc)
+    # 1) Model — phần trước dấu '-' của "Sales Model Name" (bắt buộc)
     smn = _get(kv, "Sales Model Name")
     if not smn:
         raise ValueError("Thiếu 'Sales Model Name' trong specsheet.")
@@ -173,111 +178,4 @@ def build_name_from_kv(kv: dict) -> str:
         parts.append(f"{hdd}-HDD")
 
     # 6) TPM (luôn có)
-    parts.append("TPM")
-
-    # 7) Display = Panel Size + Resolution
-    panel = _get(kv, "Panel Size")
-    res = _get(kv, "Resolution")
-    res_norm = _normalize_resolution(res) if res else ""
-    if panel or res_norm:
-        if panel and res_norm:
-            parts.append(f"{panel}{res_norm}")
-        elif panel and not res_norm:
-            parts.append(f"{panel}N/A")   # thiếu Resolution
-        elif not panel and res_norm:
-            parts.append(f"N/A{res_norm}")  # thiếu Panel Size
-    # nếu cả 2 đều thiếu -> bỏ qua
-
-    # 8) Touch (nếu có)
-    touch = _touch_code(_get(kv, "Touch Panel", "Touchscreen", "Touch"))
-    if touch:
-        parts.append(touch)
-
-    # 9) CAM (nếu có thông tin camera -> coi là có)
-    cam = _get(kv, "Camera")
-    if _bool_by_presence(cam):
-        parts.append("CAM")
-
-    # 10) MIC (nếu có)
-    mic = _get(kv, "Microphone", "Mic")
-    if _bool_by_presence(mic):
-        parts.append("MIC")
-
-    # 11) WF (nếu có)
-    wireless = _get(kv, "Wireless", "Connectivity", "LAN/WLAN")
-    wf = _wifi_code(wireless)
-    if wf:
-        parts.append(wf)
-
-    # 12) BT (nếu có)
-    if _has_bt(wireless):
-        parts.append("BT")
-
-    # 13) KB&M (từ "Keyboard & Mouse" hoặc "Included in the box"; nếu không có -> bỏ qua)
-    kbm = _kbm_code(_get(kv, "Keyboard & Mouse"), _get(kv, "Included in the box"))
-    if kbm:
-        parts.append(kbm)
-
-    # 14) Windows (bắt buộc: nếu trống => NOS)
-    parts.append(_os_code(_get(kv, "Operating System")))
-
-    # 15) Warranty
-    warr = _warranty_code(_get(kv, "Warranty", "Service"))
-    if warr:
-        parts.append(warr)
-
-    # 16) Color
-    color = _get(kv, "Color", "Colour")
-    if color:
-        parts.append(color)
-
-    # 17) Sales Model (trong ngoặc): ưu tiên "Sales Model", nếu không có thì dùng "Sales Model Name"
-    sales_model = _get(kv, "Sales Model")
-    end_token = sales_model if sales_model else smn
-    parts.append(f"({end_token})")
-
-    return "/".join(parts)
-
-# =========================
-# Streamlit UI
-# =========================
-st.title("🧩 Product Name Builder (Specsheet 2 cột)")
-
-uploaded = st.file_uploader("Upload specsheet (.xlsx)", type=["xlsx"])
-
-if uploaded is None:
-    st.info("⬆️ Hãy upload file Excel specsheet (2 cột: Key | Value).")
-else:
-    try:
-        # Đọc file người dùng upload. Không dùng header vì là bảng Key|Value
-        raw_df = pd.read_excel(uploaded, header=None)
-
-        # Hiển thị để kiểm tra
-        with st.expander("👀 Xem nhanh file input"):
-            st.dataframe(raw_df)
-
-        # Tạo kv map & build tên
-        kv = _kv_map_from_specsheet(raw_df)
-        name = build_name_from_kv(kv)
-
-        st.subheader("✅ Kết quả")
-        st.code(name, language="text")
-
-        # Cho tải 1 file Excel chỉ chứa kết quả
-        out_df = pd.DataFrame({"Generated Name": [name]})
-        bio = io.BytesIO()
-        with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
-            out_df.to_excel(writer, index=False)
-        st.download_button(
-            "💾 Tải kết quả (.xlsx)",
-            data=bio.getvalue(),
-            file_name="generated_name.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-        # Debug: xem các key đã nhận (giúp so tên dòng thực tế)
-        with st.expander("🛠 Keys đã đọc (debug)"):
-            st.write(kv)
-
-    except Exception as e:
-        st.error(f"❌ Lỗi khi xử lý: {e}")
+    p
