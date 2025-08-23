@@ -95,6 +95,40 @@ def simplify_cpu(text: str) -> str:
     # fallback: giữ nguyên
     return t
 
+def simplify_ram(text: str) -> str:
+    """
+    Chuẩn hóa RAM: <Dung lượng><DDR>*<Số thanh nếu >1>
+    - "16GB DDR5 5600MHz (2x8GB DIMM)" -> "16GD5*2"
+    - "8GB DDR4" -> "8GD4"
+    - "32GB LPDDR5X" -> "32GD5X"
+    - "16GB DDR5 SO-DIMM" -> "16GD5"
+    - "8GB DDR5 U-DIMM *2" -> "8GD5*2"
+    """
+    t = _to_str(text).upper()
+
+    # dung lượng (GB)
+    m_total = re.search(r"(\d+)\s*GB", t)
+    size = f"{m_total.group(1)}G" if m_total else ""
+
+    # loại DDR
+    ddr = ""
+    if "LPDDR5X" in t:
+        ddr = "D5X"
+    elif "DDR5" in t:
+        ddr = "D5"
+    elif "DDR4" in t:
+        ddr = "D4"
+
+    # số thanh (pattern 2x8GB, 4x…)
+    m_stick = re.search(r"(\d+)X\d+\s*GB", t)
+    qty = m_stick.group(1) if m_stick else ""
+
+    # build kết quả
+    result = size + ddr
+    if qty and qty != "1":
+        result += f"*{qty}"
+    return result if result else t
+
 
 def _wifi_code(wireless: str) -> str:
     t = _to_str(wireless).upper()
@@ -196,7 +230,7 @@ def build_name_from_kv(kv: dict) -> str:
 
 
     # 3) RAM (Memory)
-    ram = _get(kv, "Memory", "RAM")
+    ram = _get(kv, "Memory", "RAM", "DIMM Memory","System Memory", "On board memory")
     if ram: parts.append(ram)
 
     # 4) SSD
@@ -306,5 +340,6 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
 
 
