@@ -8,9 +8,9 @@ def build_name(row):
     parts = []
 
     # 1) Model — bắt buộc, lấy từ Sales Model Name trước dấu "-"
-        sales_model = str(row.get("Sales Model Name", "")).strip()
+    sales_model = str(row.get("Sales Model Name", "")).strip()
     if not sales_model or sales_model.lower() == "nan":
-    raise ValueError(f"Thiếu 'Sales Model Name' ở dòng {row.name}")
+        raise ValueError(f"Thiếu 'Sales Model Name' ở dòng {row.name}")
 
     # Tách phần trước dấu '-'
     if "-" in sales_model:
@@ -157,5 +157,6 @@ if uploaded_file is not None:
         st.error(f"❌ Lỗi khi xử lý file: {e}")
 else:
     st.info("⬆️ Vui lòng upload file Excel để bắt đầu.")
+
 
 
