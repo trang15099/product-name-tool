@@ -7,9 +7,14 @@ import pandas as pd
 def build_name(row):
     parts = []
 
-    # 1. Model
-    if "Model" in row and pd.notna(row["Model"]):
-        parts.append(str(row["Model"]).strip())
+    # 1) Model — bắt buộc, lấy từ Sales Model Name trước dấu "-"
+sales_model = str(row.get("Sales Model Name", "")).strip()
+if not sales_model or sales_model.lower() == "nan":
+    raise ValueError(f"Thiếu 'Sales Model Name' ở dòng {row.name}")
+
+# Tách phần trước dấu '-'
+if "-" in sales_model:
+    model = sales_model.split("-")[0].strip()
 
     # 2. CPU
     if "CPU" in row and pd.notna(row["CPU"]):
@@ -152,3 +157,4 @@ if uploaded_file is not None:
         st.error(f"❌ Lỗi khi xử lý file: {e}")
 else:
     st.info("⬆️ Vui lòng upload file Excel để bắt đầu.")
+
