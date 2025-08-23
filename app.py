@@ -1,142 +1,154 @@
+import streamlit as st
 import pandas as pd
 
-# Mapping độ phân giải sang code
-RESOLUTION_MAP = {
-    "1366x768": "HD",
-    "1920x1080": "FHD",
-    "1920x1200": "WUXGA",
-    "2560x1440": "QHD",
-    "2560x1600": "WQXGA",
-    "3840x2160": "4K"
-}
-
-def normalize_resolution(res):
-    if pd.isna(res):
-        return None
-    res = str(res).upper().replace(" ", "")
-    for k, v in RESOLUTION_MAP.items():
-        if k in res or v in res:
-            return v
-    return "N/A"
-
+# ----------------
+# RULES XỬ LÝ TÊN
+# ----------------
 def build_name(row):
     parts = []
 
     # 1. Model
-    if not pd.isna(row.get("Model")):
+    if "Model" in row and pd.notna(row["Model"]):
         parts.append(str(row["Model"]).strip())
 
     # 2. CPU
-    if not pd.isna(row.get("CPU")):
+    if "CPU" in row and pd.notna(row["CPU"]):
         parts.append(str(row["CPU"]).strip())
 
     # 3. RAM
-    if not pd.isna(row.get("Memory")):
-        parts.append(str(row["Memory"]).strip())
+    if "RAM" in row and pd.notna(row["RAM"]):
+        parts.append(str(row["RAM"]).strip())
 
     # 4. SSD
-    if not pd.isna(row.get("SSD")):
-        parts.append(f"{row['SSD']}-SSD")
+    if "SSD" in row and pd.notna(row["SSD"]):
+        parts.append(str(row["SSD"]).strip())
 
     # 5. HDD
-    if not pd.isna(row.get("HDD")):
-        parts.append(f"{row['HDD']}-HDD")
+    if "HDD" in row and pd.notna(row["HDD"]):
+        parts.append(str(row["HDD"]).strip())
 
     # 6. TPM (luôn có)
-    parts.append("TPM")
+    if "TPM" in row and pd.notna(row["TPM"]):
+        parts.append(str(row["TPM"]).strip())
 
-    # 7. Display
-    panel = row.get("Panel Size")
-    res = row.get("Resolution")
-    res_norm = normalize_resolution(res)
+    # 7. Display = Panel Size + Resolution
+    panel = str(row.get("Panel Size", "")).strip()
+    res = str(row.get("Resolution", "")).strip()
 
-    if pd.isna(panel) and pd.isna(res):
-        pass
-    elif pd.isna(panel):
-        parts.append(f"N/A{res_norm}")
-    elif pd.isna(res):
+    if panel and res:
+        if res.upper() in ["FHD", "WUXGA", "WQXGA"]:
+            parts.append(f"{panel}{res.upper()}")
+        else:
+            parts.append(f"{panel}{res}")  
+    elif panel and not res:
         parts.append(f"{panel}N/A")
-    else:
-        parts.append(f"{panel}{res_norm}")
+    elif res and not panel:
+        parts.append(f"N/A{res}")
 
     # 8. Touch
-    if not pd.isna(row.get("Touch Panel")):
-        parts.append("T")
+    if "Touch panel" in row and pd.notna(row["Touch panel"]):
+        if str(row["Touch panel"]).lower() == "yes":
+            parts.append("T")
 
-    # 9. Camera
-    if not pd.isna(row.get("Camera")):
+    # 9. CAM
+    if "Camera" in row and pd.notna(row["Camera"]):
         parts.append("CAM")
 
-    # 10. Mic
-    if not pd.isna(row.get("Microphone")):
+    # 10. MIC
+    if "Microphone" in row and pd.notna(row["Microphone"]):
         parts.append("MIC")
 
-    # 11-12. Wireless & BT
-    wireless = str(row.get("Wireless", "")).upper()
-    if "WIFI" in wireless or "WI-FI" in wireless:
-        if "6E" in wireless:
+    # 11. Wireless (WF + BT)
+    if "Wireless" in row and pd.notna(row["Wireless"]):
+        wireless_val = str(row["Wireless"]).upper()
+        if "WF" in wireless_val:
             parts.append("WF6E")
-        elif "6" in wireless:
-            parts.append("WF6")
-        elif "5" in wireless:
-            parts.append("WF5")
-    if "BT" in wireless or "BLUETOOTH" in wireless:
-        parts.append("BT")
+        if "BT" in wireless_val:
+            parts.append("BT")
 
-    # 13. Keyboard & Mouse
-    kbm = str(row.get("Keyboard & Mouse") or row.get("Included in the box") or "").upper()
+    # 12. Keyboard & Mouse
+    kb_mouse = str(row.get("Keyboard & Mouse", row.get("Included in the box", ""))).lower()
     kb_parts = []
-    if "WIRELESS KEYBOARD" in kbm:
+    if "wireless keyboard" in kb_mouse:
         kb_parts.append("WL_KB")
-    elif "KEYBOARD" in kbm:
+    elif "keyboard" in kb_mouse:
         kb_parts.append("KB")
-    if "WIRELESS MOUSE" in kbm:
+
+    if "wireless mouse" in kb_mouse:
         kb_parts.append("WL_M")
-    elif "MOUSE" in kbm:
+    elif "mouse" in kb_mouse:
         kb_parts.append("M")
+
     if kb_parts:
         parts.append("&".join(kb_parts))
 
-    # 14. Windows
-    osys = str(row.get("Operating System") or "").upper()
-    if "WINDOWS 11 HOME" in osys:
+    # 13. Windows
+    os_val = str(row.get("Operating System", "")).strip()
+    if "windows 11 home" in os_val.lower():
         parts.append("W11H")
-    elif "WINDOWS 11 PRO" in osys:
+    elif "windows 11 pro" in os_val.lower():
         parts.append("W11P")
-    else:
+    elif os_val == "" or os_val.lower() == "nan":
         parts.append("NOS")
 
-    # 15. Warranty
-    warranty = str(row.get("Warranty") or "").upper()
-    if "3" in warranty:
-        year = "3Y"
-    elif "2" in warranty:
-        year = "2Y"
-    elif "1" in warranty:
-        year = "1Y"
-    else:
+    # 14. Warranty
+    warranty_val = str(row.get("Warranty", "")).strip().lower()
+    if warranty_val:
         year = ""
-    if "ON SITE" in warranty:
-        parts.append(f"{year}-OSS")
-    elif "PUR" in warranty:
-        parts.append(f"{year}-PUR")
+        wtype = ""
+        for token in warranty_val.split():
+            if "year" in token:
+                year = token.replace("year", "").replace("years", "").strip() + "Y"
+            if "oss" in token or "on site" in token:
+                wtype = "OSS"
+            if "pur" in token:
+                wtype = "PUR"
+        if year and wtype:
+            parts.append(f"{year}-{wtype}")
 
-    # 16. Color
-    if not pd.isna(row.get("Color")):
+    # 15. Color
+    if "Color" in row and pd.notna(row["Color"]):
         parts.append(str(row["Color"]).strip())
 
-    # 17. Sales Model
-    if not pd.isna(row.get("Sales Model")):
-        parts.append(f"({row['Sales Model']})")
+    # 16. Sales Model (luôn nằm cuối, trong ngoặc)
+    if "Sales Model" in row and pd.notna(row["Sales Model"]):
+        parts.append(f"({str(row['Sales Model']).strip()})")
 
     return "/".join(parts)
 
-def process_excel(file_path, output_path="output.csv"):
-    df = pd.read_excel(file_path)
-    df["GeneratedName"] = df.apply(build_name, axis=1)
-    df.to_csv(output_path, index=False, encoding="utf-8-sig")
-    print(f"✅ Done! Kết quả được lưu vào {output_path}")
 
-if __name__ == "__main__":
-    # Chạy thử với file test.xlsx
-    process_excel("test.xlsx")
+# ----------------
+# STREAMLIT APP
+# ----------------
+st.title("📦 Product Name Builder")
+
+uploaded_file = st.file_uploader("Upload file Excel", type=["xlsx"])
+
+if uploaded_file is not None:
+    try:
+        df = pd.read_excel(uploaded_file)
+        st.success("✅ File uploaded successfully!")
+        st.dataframe(df.head())  
+
+        # Build tên sản phẩm
+        df["Generated Name"] = df.apply(build_name, axis=1)
+
+        st.subheader("📋 Generated Product Names")
+        st.dataframe(df[["Generated Name"]])
+
+        # Download kết quả
+        output_file = "generated_names.xlsx"
+        df.to_excel(output_file, index=False)
+
+        with open(output_file, "rb") as f:
+            st.download_button(
+                label="💾 Download Excel",
+                data=f,
+                file_name="generated_names.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    except Exception as e:
+        st.error(f"❌ Lỗi khi xử lý file: {e}")
+else:
+    st.info("⬆️ Vui lòng upload file Excel để bắt đầu.")
