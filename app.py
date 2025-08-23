@@ -164,8 +164,13 @@ def build_name_from_kv(kv: dict) -> str:
     parts.append(model)
 
     # 2) CPU
-    cpu = _get(kv, "CPU", "Processor")
-    if cpu: parts.append(cpu)
+    cpu = ""
+    for k, v in kv.items():
+        if "processor" in k:   # match cả "On board processor", "Processor"
+            cpu = v
+            break
+    if cpu:
+        parts.append(cpu)
 
     # 3) RAM (Memory)
     ram = _get(kv, "Memory", "RAM")
@@ -278,3 +283,4 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
