@@ -1,7 +1,6 @@
 # app.py
-# Streamlit: tạo tên sản phẩm từ specsheet Excel dạng 2 cột (Key | Value)
+# Streamlit tool: Upload specsheet Excel (2 cột Key | Value) -> build tên sản phẩm theo rule
 # Yêu cầu: streamlit, pandas, openpyxl, xlsxwriter
-
 import streamlit as st
 import pandas as pd
 import io
@@ -25,7 +24,7 @@ def _to_str(x):
     if x is None or (isinstance(x, float) and pd.isna(x)):
         return ""
     s = str(x).strip()
-    return "" if s.lower() in ("nan", "none", "null") else s
+    return "" if s.lower() in ("nan", "none", "null", "-") else s
 
 def _norm_key(s: str) -> str:
     s = _to_str(s).lower()
@@ -36,8 +35,8 @@ def _norm_key(s: str) -> str:
 def _kv_map_from_specsheet(df: pd.DataFrame) -> dict:
     """
     Nhận DataFrame specsheet 2 cột (Key|Value), trả về dict {key_norm: value}
-    - Nếu có >2 cột: dùng 2 cột đầu.
-    - Nếu chỉ 1 cột dạng "Key: Value" thì cố gắng tách.
+    - Nếu >2 cột: dùng 2 cột đầu
+    - Nếu chỉ 1 cột dạng "Key: Value" thì cố gắng tách
     """
     if df.shape[1] < 2:
         df2 = df.copy()
@@ -68,10 +67,10 @@ def _normalize_resolution(res: str) -> str:
     if not raw:
         return ""
     s = raw.upper().replace(" ", "")
-    # nếu đã là mã (FHD/WUXGA/...) thì giữ
+    # đã là mã (FHD/WUXGA/...) -> giữ
     if s in {v.upper() for v in RESOLUTION_MAP.values()}:
         return s
-    # map theo số 1920x1080 -> FHD, ...
+    # map theo số: 1920x1080 -> FHD ...
     mapped = RESOLUTION_MAP.get(s.lower(), "")
     return mapped if mapped else raw
 
@@ -97,9 +96,9 @@ def _touch_code(val: str) -> str:
     t = _to_str(val).lower()
     return "T" if any(x in t for x in ["yes", "touch", "capacitive", "multi-touch", "multi touch"]) else ""
 
-def _bool_by_presence(val: str) -> bool:
+def _truthy(val: str) -> bool:
     t = _to_str(val).lower()
-    return bool(t) and t not in ("no", "không", "none", "n/a")
+    return bool(t) and t not in ("no", "không", "none", "n/a", "na", "0")
 
 def _kbm_code(kb_mouse: str, included_box: str) -> str:
     src = f"{_to_str(kb_mouse)} {_to_str(included_box)}".lower()
@@ -124,14 +123,21 @@ def _os_code(os_text: str) -> str:
         return "W11P"
     if "windows 11 home" in t:
         return "W11H"
-    return "NOS"  # bắt buộc có, thiếu => NOS
+    return "NOS"  # bắt buộc có, thiếu -> NOS
 
 def _warranty_code(w_text: str) -> str:
     t = _to_str(w_text).lower()
     if not t:
         return ""
-    m = re.search(r"(\d+)\s*(year|years|y)\b", t)
-    year = f"{m.group(1)}Y" if m else ""
+    # năm
+    m_year = re.search(r"(\d+)\s*(year|years|y)\b", t)
+    year = f"{m_year.group(1)}Y" if m_year else ""
+    # fallback: tháng
+    if not year:
+        m_month = re.search(r"(\d+)\s*(month|months|m)\b", t)
+        if m_month:
+            n = int(m_month.group(1))
+            year = f"{max(1, round(n/12))}Y"
     wtype = ""
     if "on site" in t or "onsite" in t or "on-site" in t:
         wtype = "OSS"
@@ -146,11 +152,11 @@ def build_name_from_kv(kv: dict) -> str:
     """
     Thứ tự cố định:
     Model + CPU + RAM + SSD + HDD(if) + TPM + Display + T(if) + CAM(if) + MIC(if) + WF(if) + BT(if)
-    + KB&M(if) + Windows(mandatory, NOS if missing) + Warranty(if) + Color(if) + (Sales Model or Sales Model Name)
+    + KB&M(if) + Windows (NOS if missing) + Warranty(if) + Color(if) + (Sales Model)
     """
     parts = []
 
-    # 1) Model — phần trước dấu '-' của "Sales Model Name" (bắt buộc)
+    # 1) Model — phần trước '-' của "Sales Model Name" (bắt buộc)
     smn = _get(kv, "Sales Model Name")
     if not smn:
         raise ValueError("Thiếu 'Sales Model Name' trong specsheet.")
@@ -159,23 +165,116 @@ def build_name_from_kv(kv: dict) -> str:
 
     # 2) CPU
     cpu = _get(kv, "CPU", "Processor")
-    if cpu:
-        parts.append(cpu)
+    if cpu: parts.append(cpu)
 
     # 3) RAM (Memory)
     ram = _get(kv, "Memory", "RAM")
-    if ram:
-        parts.append(ram)
+    if ram: parts.append(ram)
 
     # 4) SSD
     ssd = _get(kv, "SSD")
-    if ssd:
-        parts.append(f"{ssd}-SSD")
+    if ssd: parts.append(f"{ssd}-SSD")
 
     # 5) HDD (nếu có)
     hdd = _get(kv, "HDD")
-    if hdd:
-        parts.append(f"{hdd}-HDD")
+    if hdd: parts.append(f"{hdd}-HDD")
 
     # 6) TPM (luôn có)
-    p
+    parts.append("TPM")
+
+    # 7) Display = Panel Size + Resolution (chuẩn hóa; thiếu 1 nửa -> N/A; thiếu cả 2 -> bỏ)
+    panel = _get(kv, "Panel Size")
+    res_raw = _get(kv, "Resolution")
+    res_norm = _normalize_resolution(res_raw) if res_raw else ""
+    if panel or res_norm:
+        if panel and res_norm:
+            parts.append(f"{panel}{res_norm}")
+        elif panel and not res_norm:
+            parts.append(f"{panel}N/A")
+        elif not panel and res_norm:
+            parts.append(f"N/A{res_norm}")
+
+    # 8) Touch (nếu có)
+    touch = _touch_code(_get(kv, "Touch Panel", "Touchscreen", "Touch"))
+    if touch: parts.append(touch)
+
+    # 9) CAM (nếu có)
+    cam = _get(kv, "Camera")
+    if _truthy(cam): parts.append("CAM")
+
+    # 10) MIC (nếu có)
+    mic = _get(kv, "Microphone", "Mic")
+    if _truthy(mic): parts.append("MIC")
+
+    # 11) WF + 12) BT (từ dòng Wireless)
+    wireless = _get(kv, "Wireless", "Connectivity", "LAN/WLAN")
+    wf = _wifi_code(wireless)
+    if wf: parts.append(wf)
+    if _has_bt(wireless): parts.append("BT")
+
+    # 13) KB&M (Keyboard & Mouse hoặc Included in the box)
+    kbm = _kbm_code(_get(kv, "Keyboard & Mouse", "Keyboard and Mouse"),
+                    _get(kv, "Included in the box"))
+    if kbm: parts.append(kbm)
+
+    # 14) Windows (bắt buộc -> nếu trống => NOS)
+    parts.append(_os_code(_get(kv, "Operating System")))
+
+    # 15) Warranty
+    warr = _warranty_code(_get(kv, "Warranty", "Service"))
+    if warr: parts.append(warr)
+
+    # 16) Color
+    color = _get(kv, "Color", "Colour")
+    if color: parts.append(color)
+
+    # 17) Sales Model (trong ngoặc) — ưu tiên "Sales Model", nếu không có thì dùng "Sales Model Name"
+    sales_model = _get(kv, "Sales Model")
+    end_token = sales_model if sales_model else smn
+    parts.append(f"({end_token})")
+
+    return "/".join(parts)
+
+# =========================
+# Streamlit UI (Upload file)
+# =========================
+st.title("🧩 Product Name Builder — Specsheet 2 cột")
+
+uploaded = st.file_uploader("Upload specsheet (.xlsx)", type=["xlsx"])
+
+if uploaded is None:
+    st.info("⬆️ Hãy upload file Excel specsheet (2 cột: Key | Value).")
+else:
+    try:
+        # Đọc trực tiếp file upload (không dùng header vì là bảng Key|Value)
+        raw_df = pd.read_excel(uploaded, header=None)
+
+        # Hiển thị nhanh input để kiểm tra
+        with st.expander("👀 Xem nhanh file input"):
+            st.dataframe(raw_df)
+
+        # Parse và build tên
+        kv = _kv_map_from_specsheet(raw_df)
+        name = build_name_from_kv(kv)
+
+        st.subheader("✅ Kết quả")
+        st.code(name, language="text")
+
+        # Cho tải Excel chứa kết quả (1 dòng)
+        out_df = pd.DataFrame({"Generated Name": [name]})
+        bio = io.BytesIO()
+        with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
+            out_df.to_excel(writer, index=False)
+        st.download_button(
+            "💾 Tải kết quả (.xlsx)",
+            data=bio.getvalue(),
+            file_name="generated_name.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        # Debug: xem các key đã nhận (để so tên dòng có khớp không)
+        with st.expander("🛠 Keys đã đọc (debug)"):
+            st.write(kv)
+
+    except Exception as e:
+        st.error(f"❌ Lỗi khi xử lý: {e}")
