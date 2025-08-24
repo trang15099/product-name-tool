@@ -345,12 +345,26 @@ def _kbm_code(kb_mouse: str, included_box: str) -> str:
     return "&".join(tags) if tags else ""
 
 def _os_code(os_text: str) -> str:
-    t = _to_str(os_text).lower()
-    if "windows 11 pro" in t:
-        return "W11P"
-    if "windows 11 home" in t:
+    """
+    Chuẩn hóa hệ điều hành:
+    1. Có 'Windows 11 Home' -> W11H
+    2. Có 'Windows 11 Pro' (mà không có Home) -> W11P
+    3. Có 'Windows' nhưng không rõ Home/Pro -> WIN
+    4. Nếu trống -> NOS
+    """
+    t = _to_str(os_text).upper()
+    if not t:
+        return "NOS"
+
+    if "WINDOWS 11 HOME" in t:
         return "W11H"
-    return "NOS"  # bắt buộc có, thiếu -> NOS
+    if "WINDOWS 11 PRO" in t:
+        return "W11P"
+    if "WINDOWS" in t:
+        return "WIN"
+
+    return "NOS"
+
 
 def _warranty_code(w_text: str) -> str:
     t = _to_str(w_text).lower()
@@ -553,6 +567,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
