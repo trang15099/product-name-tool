@@ -290,6 +290,39 @@ def _touch_code(val: str) -> str:
     t = _to_str(val).lower()
     return "T" if any(x in t for x in ["yes", "touch", "capacitive", "multi-touch", "multi touch"]) else ""
 
+def simplify_psu(text: str) -> str:
+    """
+    Chuẩn hóa PSU: <Watt>*<qty>
+    - "180W" -> "180W"
+    - "2x180W" -> "180W*2"
+    - "180W*3" -> "180W*3"
+    """
+    t = _to_str(text).upper()
+    if not t:
+        return ""
+
+    # pattern 2x180W
+    m = re.search(r"(\d+)[Xx]\s*(\d+)\s*W", t)
+    if m:
+        qty = m.group(1)
+        watts = m.group(2)
+        return f"{watts}W*{qty}"
+
+    # pattern 180W*3
+    m = re.search(r"(\d+)\s*W\s*\*\s*(\d+)", t)
+    if m:
+        watts = m.group(1)
+        qty = m.group(2)
+        return f"{watts}W*{qty}"
+
+    # pattern đơn lẻ 180W
+    m = re.search(r"(\d+)\s*W", t)
+    if m:
+        return f"{m.group(1)}W"
+
+    return ""
+
+
 def _truthy(val: str) -> bool:
     t = _to_str(val).lower()
     return bool(t) and t not in ("no", "không", "none", "n/a", "na", "0")
@@ -346,9 +379,7 @@ def build_name_from_kv(kv: dict, group: str):
     errors = []
     
     """
-    Thứ tự cố định:
-    Model + CPU + RAM + SSD + HDD(if) + TPM + Display + T(if) + CAM(if) + MIC(if) + WF(if) + BT(if)
-    + KB&M(if) + Windows (NOS if missing) + Warranty(if) + Color(if) + (Sales Model)
+    Product Name = Model + CPU + RAM + SSD + HDD(if) + TPM + Display + T(if) + WF/BT(if) + KB&M(if) + Windows (NOS if missing) + Warranty(if) + Color(if) + (Sales Model)
     """
     parts = []
 
@@ -430,13 +461,22 @@ def build_name_from_kv(kv: dict, group: str):
                 parts.append("T")
     # PC/Server/ACCY: bỏ qua Touch
 
-    # 9) CAM (nếu có)
-    cam = _get(kv, "Camera")
-    if _truthy(cam): parts.append("CAM")
+    # 9) CAM & MIC — auto cho AIO
+    if group == "AIO":
+        parts.append("CAM")
+        parts.append("MIC")
 
-    # 10) MIC (nếu có)
-    mic = _get(kv, "Microphone", "Mic")
-    if _truthy(mic): parts.append("MIC")
+    # 10) Power Supply — bắt buộc cho PC/Server
+    psu_raw = _get(kv, "Power Supply")
+    psu = simplify_psu(psu_raw)
+
+    if psu:
+        parts.append(psu)
+    else:
+        if group in {"PC", "Server"}:
+            parts.append("PSU_N/A")
+            errors.append(f"Thiếu Power Supply cho nhóm {group}")
+
 
     # 11) WF + 12) BT (từ dòng Wireless)
     wireless = _get(kv, "Wireless", "Connectivity", "LAN/WLAN")
@@ -513,6 +553,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
