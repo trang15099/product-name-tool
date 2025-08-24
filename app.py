@@ -418,8 +418,8 @@ group = st.selectbox(
 
 
 # ⛔️ Yêu cầu: phải có file + đã chọn nhóm
-if uploaded is None or group is None:
-    
+#if uploaded is None or group is None:
+if group is None:
     if group is None:
         st.info("🔽⬆️ Chọn nhóm sản phẩm")
     if uploaded is None:
@@ -428,6 +428,11 @@ if uploaded is None or group is None:
 
 # 📤 Upload file
 uploaded = st.file_uploader("Upload specsheet (.xlsx)", type=["xlsx"])
+
+if uploaded is None:
+    if uploaded is None:
+        st.info("🔽 Upload file Excel specsheet")
+    st.stop()
 
 # ✅ Đủ điều kiện -> xử lý
 raw_df = pd.read_excel(uploaded, header=None)
@@ -444,6 +449,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
