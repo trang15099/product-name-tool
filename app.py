@@ -129,6 +129,85 @@ def simplify_ram(text: str) -> str:
         result += f"*{qty}"
     return result if result else t
 
+from collections import OrderedDict
+import re
+
+def _ssd_parse_counts(text: str, assume_is_ssd: bool = False) -> OrderedDict:
+    """
+    Trả về OrderedDict { '512G': 2, '256G': 1, '1T': 1, ... } theo đúng thứ tự xuất hiện.
+    - Chỉ lấy các cụm dung lượng SSD trong 'text'.
+    - Nếu assume_is_ssd=True (ví dụ key là 'SSD'), coi toàn bộ text là SSD, không cần từ 'SSD'.
+    - Không chuyển GB<->TB; chỉ đổi đuôi: GB->G, TB->T.
+    """
+    t = _to_str(text).upper()
+    if not t:
+        return OrderedDict()
+
+    # nếu không assume và text không có 'SSD' -> bỏ
+    if not assume_is_ssd and "SSD" not in t:
+        return OrderedDict()
+
+    # tách theo + / , ; & để giữ thứ tự xuất hiện từng mảnh
+    chunks = re.split(r"[+,/;&]", t)
+
+    counts = OrderedDict()
+    def add(size_num: str, unit: str, qty: int):
+        # unit = GB|TB -> G|T
+        unit_short = "G" if unit == "GB" else "T"
+        key = f"{size_num}{unit_short}"
+        if key not in counts:
+            counts[key] = 0
+        counts[key] += qty
+
+    for raw in chunks:
+        c = raw.strip()
+        if not c:
+            continue
+        if (not assume_is_ssd) and ("SSD" not in c):
+            # với chunks từ 'Storage'… chỉ nhận mảnh có SSD
+            continue
+
+        # Pattern 1: 2x512GB | 3x1TB
+        for m in re.finditer(r"(\d+)\s*[Xx]\s*(\d+)\s*(GB|TB)", c):
+            qty = int(m.group(1))
+            size = m.group(2)
+            unit = m.group(3)
+            add(size, unit, qty)
+
+        # Pattern 2: 512GB*2 | 1TB * 3
+        for m in re.finditer(r"(\d+)\s*(GB|TB)\s*\*\s*(\d+)", c):
+            size = m.group(1)
+            unit = m.group(2)
+            qty  = int(m.group(3))
+            add(size, unit, qty)
+
+        # Pattern 3: đơn lẻ 512GB | 1TB (không có *n hay 2x…)
+        # tránh đếm trùng những cái đã match ở trên nên ta remove tạm thời rồi quét nốt phần còn lại
+        c_tmp = re.sub(r"(\d+\s*[Xx]\s*\d+\s*(GB|TB))", " ", c)
+        c_tmp = re.sub(r"(\d+\s*(GB|TB)\s*\*\s*\d+)", " ", c_tmp)
+        for m in re.finditer(r"(\d+)\s*(GB|TB)", c_tmp):
+            size = m.group(1)
+            unit = m.group(2)
+            add(size, unit, 1)
+
+    return counts
+
+def _ssd_format_output(counts: OrderedDict) -> str:
+    """
+    Biến counts -> chuỗi theo rule:
+    - Nếu chỉ 1 loại dung lượng: 512G-SSD hoặc 512G-SSD*2
+    - Nếu nhiều loại: 512G+256G*2-SSD (nối bằng '+', mỗi loại có *qty nếu >1, '-SSD' ở cuối)
+    """
+    if not counts:
+        return ""
+    parts = []
+    for size, qty in counts.items():
+        if qty > 1:
+            parts.append(f"{size}*{qty}")
+        else:
+            parts.append(size)
+    return "+".join(parts) + "-SSD"
+
 
 def _wifi_code(wireless: str) -> str:
     t = _to_str(wireless).upper()
@@ -235,9 +314,30 @@ def build_name_from_kv(kv: dict) -> str:
         parts.append(simplify_ram(ram_raw))
 
 
-    # 4) SSD
-    ssd = _get(kv, "SSD")
-    if ssd: parts.append(f"{ssd}-SSD")
+    # 4) SSD — lấy theo rule mới (chỉ dung lượng-SSD; nhiều loại nối '+'; có *n nếu >1)
+    ssd_counts = OrderedDict()
+
+    # Ưu tiên các key “thuần SSD”
+    for kname in ["SSD", "Solid State Drive"]:
+        val = _get(kv, kname)
+        if val:
+            # toàn bộ chuỗi coi là SSD
+            cdict = _ssd_parse_counts(val, assume_is_ssd=True)
+            for k, v in cdict.items():
+                ssd_counts[k] = ssd_counts.get(k, 0) + v
+
+    # Sau đó quét thêm các key storage tổng hợp
+    for kname in ["Storage", "Primary Storage", "Storage 1", "Storage 2", "Drive Capacity"]:
+        val = _get(kv, kname)
+        if val:
+            cdict = _ssd_parse_counts(val, assume_is_ssd=False)
+            for k, v in cdict.items():
+                ssd_counts[k] = ssd_counts.get(k, 0) + v
+
+    ssd_out = _ssd_format_output(ssd_counts)
+    if ssd_out:
+        parts.append(ssd_out)
+
 
     # 5) HDD (nếu có)
     hdd = _get(kv, "HDD")
@@ -302,12 +402,12 @@ def build_name_from_kv(kv: dict) -> str:
 # =========================
 # Streamlit UI (Upload file)
 # =========================
-st.title("🧩 Product Name Builder — Specsheet 2 cột")
+st.title("🧩 Product Name Builder")
 
 uploaded = st.file_uploader("Upload specsheet (.xlsx)", type=["xlsx"])
 
 if uploaded is None:
-    st.info("⬆️ Hãy upload file Excel specsheet (2 cột: Key | Value).")
+    st.info("⬆️ Upload file Excel specsheet")
 else:
     try:
         # Đọc trực tiếp file upload (không dùng header vì là bảng Key|Value)
@@ -342,6 +442,7 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
 
 
 
