@@ -416,11 +416,18 @@ def build_name_from_kv(kv: dict, group: str):
     errors.extend(errs)
 
 
-    # 8) Touch — chỉ với nhóm NB/AIO, chỉ khi key "Touch Panel" có value "Touch screen"
+    # 8) Touch — chỉ với nhóm NB/AIO, value "Touch screen"
     if group in {"NB", "AIO"}:
         touch_val = _get(kv, "Touch Panel")
-        if touch_val and re.search(r"\btouch\s*screen\b", str(touch_val), flags=re.IGNORECASE):
-            parts.append("T")
+        if touch_val:
+            tv = str(touch_val).strip().lower()
+        # chặn các phủ định trước
+            negatives = ["non-touch", "non touch", "without touch", "no touch"]
+            is_negative = any(n in tv for n in negatives)
+        # chỉ chấp nhận đúng "touch screen" (không dính phủ định)
+            is_touch = (not is_negative) and bool(re.search(r"\btouch\s*screen\b", tv, flags=re.I))
+            if is_touch:
+                parts.append("T")
     # PC/Server/ACCY: bỏ qua Touch
 
     # 9) CAM (nếu có)
@@ -480,8 +487,7 @@ group = st.selectbox(
 if group is None:
     if group is None:
         st.info("🔽⬆️ Chọn nhóm sản phẩm")
-    if uploaded is None:
-        st.info("🔽 Upload file Excel specsheet")
+    
     st.stop()
 
 # 📤 Upload file
@@ -507,6 +513,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
