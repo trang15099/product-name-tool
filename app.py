@@ -314,26 +314,26 @@ def build_name_from_kv(kv: dict) -> str:
     if ram_raw:
         parts.append(simplify_ram(ram_raw))
 
-
-    # 4) SSD — lấy theo rule mới (chỉ dung lượng-SSD; nhiều loại nối '+'; có *n nếu >1)
+    # 4) SSD — dedupe nguồn + parse theo rule
     ssd_counts = OrderedDict()
+    seen_values = set()
 
-    # Ưu tiên các key “thuần SSD”
-    for kname in ["SSD", "Solid State Drive","Storage"]:
-        val = _get(kv, kname)
-        if val:
-            # toàn bộ chuỗi coi là SSD
-            cdict = _ssd_parse_counts(val, assume_is_ssd=True)
-            for k, v in cdict.items():
-                ssd_counts[k] = ssd_counts.get(k, 0) + v
+    SSD_KEYS = {"SSD", "Solid State Drive"}
+    STO_KEYS = {"Storage", "Primary Storage", "Storage 1", "Storage 2", "Drive Capacity"}
 
-    # Sau đó quét thêm các key storage tổng hợp
-    for kname in ["Storage", "Primary Storage", "Storage 1", "Storage 2", "Drive Capacity"]:
+    for kname in list(SSD_KEYS) + list(STO_KEYS):
         val = _get(kv, kname)
-        if val:
-            cdict = _ssd_parse_counts(val, assume_is_ssd=False)
-            for k, v in cdict.items():
-                ssd_counts[k] = ssd_counts.get(k, 0) + v
+        val_norm = _to_str(val)
+        if not val_norm:
+            continue
+        # ❗ tránh đếm 2 lần cùng một chuỗi (ví dụ cả ở SSD và Storage)
+        if val_norm in seen_values:
+            continue
+        seen_values.add(val_norm)
+
+        cdict = _ssd_parse_counts(val_norm, assume_is_ssd=(kname in SSD_KEYS))
+        for k, v in cdict.items():
+            ssd_counts[k] = ssd_counts.get(k, 0) + v
 
     ssd_out = _ssd_format_output(ssd_counts)
     if ssd_out:
@@ -443,6 +443,7 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
 
 
 
