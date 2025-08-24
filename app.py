@@ -129,6 +129,7 @@ def simplify_ram(text: str) -> str:
         result += f"*{qty}"
     return result if result else t
 
+#Chuẩn hóa cách đọc SSD - Storage
 from collections import OrderedDict
 import re
 
@@ -318,7 +319,7 @@ def build_name_from_kv(kv: dict) -> str:
     ssd_counts = OrderedDict()
 
     # Ưu tiên các key “thuần SSD”
-    for kname in ["SSD", "Solid State Drive"]:
+    for kname in ["SSD", "Solid State Drive","Storage"]:
         val = _get(kv, kname)
         if val:
             # toàn bộ chuỗi coi là SSD
@@ -442,6 +443,7 @@ else:
 
     except Exception as e:
         st.error(f"❌ Lỗi khi xử lý: {e}")
+
 
 
 
