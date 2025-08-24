@@ -131,7 +131,7 @@ def simplify_ram(text: str) -> str:
 
 #Chuẩn hóa cách đọc SSD - Storage
 from collections import OrderedDict
-import re
+
 
 def _ssd_parse_counts(text: str, assume_is_ssd: bool = False) -> OrderedDict:
     """
@@ -208,6 +208,64 @@ def _ssd_format_output(counts: OrderedDict) -> str:
         else:
             parts.append(size)
     return "+".join(parts) + "-SSD"
+
+
+def simplify_display(panel: str, res: str, group: str) -> tuple[str, list]:
+    """
+    Chuẩn hóa Display theo rule:
+    - Panel Size: chuẩn hóa xx.x (1 chữ số thập phân).
+    - Resolution: giữ nguyên FHD/WUXGA/...; nếu chỉ số thì giữ nguyên dạng số.
+    - Ghép thành <size><res>.
+    - Nếu thiếu 1 phần -> thêm N/A.
+    - Nếu thiếu cả 2 -> bỏ qua (trừ NB/AIO thì báo lỗi).
+    """
+    errors = []
+
+    panel_val = ""
+    res_val = ""
+
+    # --- Panel Size ---
+    if panel:
+        m = re.search(r"(\d+[.,]?\d*)", str(panel))
+        if m:
+            try:
+                panel_num = float(m.group(1).replace(",", "."))
+                panel_val = f"{panel_num:.1f}"  # 1 số thập phân
+            except:
+                panel_val = "N/A"
+        else:
+            panel_val = "N/A"
+
+    # --- Resolution ---
+    if res:
+        r = str(res).upper()
+        # lấy các từ khoá gọn
+        if any(short in r for short in ["FHD", "WUXGA", "WQXGA", "QHD", "4K"]):
+            if "FHD" in r: res_val = "FHD"
+            elif "WUXGA" in r: res_val = "WUXGA"
+            elif "WQXGA" in r: res_val = "WQXGA"
+            elif "QHD" in r: res_val = "QHD"
+            elif "4K" in r: res_val = "4K"
+        else:
+            # nếu chỉ có dạng số (1920x1080 …) thì giữ nguyên
+            m = re.search(r"\d{3,4}x\d{3,4}", r)
+            if m:
+                res_val = m.group(0)
+            else:
+                res_val = "N/A"
+
+    # --- Build result ---
+    if not panel_val and not res_val:
+        # thiếu cả 2
+        if group in {"NB", "AIO"}:
+            errors.append(f"Thiếu Display (Panel Size/Resolution) cho nhóm {group}")
+        return "", errors
+    elif panel_val and res_val:
+        return f"{panel_val}{res_val}", errors
+    elif panel_val and not res_val:
+        return f"{panel_val}N/A", errors
+    elif not panel_val and res_val:
+        return f"N/A{res_val}", errors
 
 
 def _wifi_code(wireless: str) -> str:
@@ -351,15 +409,12 @@ def build_name_from_kv(kv: dict, group: str):
 
     # 7) Display = Panel Size + Resolution (chuẩn hóa; thiếu 1 nửa -> N/A; thiếu cả 2 -> bỏ)
     panel = _get(kv, "Panel Size")
-    res_raw = _get(kv, "Resolution")
-    res_norm = _normalize_resolution(res_raw) if res_raw else ""
-    if panel or res_norm:
-        if panel and res_norm:
-            parts.append(f"{panel}{res_norm}")
-        elif panel and not res_norm:
-            parts.append(f"{panel}N/A")
-        elif not panel and res_norm:
-            parts.append(f"N/A{res_norm}")
+    res   = _get(kv, "Resolution")
+    display, errs = simplify_display(panel, res, group)
+    if display:
+        parts.append(display)
+    errors.extend(errs)
+
 
     # 8) Touch (nếu có)
     touch = _touch_code(_get(kv, "Touch Panel", "Touchscreen", "Touch"))
@@ -431,7 +486,7 @@ uploaded = st.file_uploader("Upload specsheet (.xlsx)", type=["xlsx"])
 
 if uploaded is None:
     if uploaded is None:
-        st.info("🔽 Upload file Excel specsheet")
+        st.info("🔼 Upload file Excel specsheet")
     st.stop()
 
 # ✅ Đủ điều kiện -> xử lý
@@ -440,7 +495,7 @@ kv = _kv_map_from_specsheet(raw_df)
 
 name, errors = build_name_from_kv(kv, group=group)  # nhớ sửa chữ ký hàm nhận group và trả (name, errors)
 
-st.subheader("✅ Kết quả")
+st.subheader("✅ Result")
 st.code(name, language="text")
 if errors:
     st.warning("⚠️ " + " | ".join(errors))
@@ -449,6 +504,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
