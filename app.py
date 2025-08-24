@@ -284,7 +284,9 @@ def _warranty_code(w_text: str) -> str:
 # =========================
 # Core build logic
 # =========================
-def build_name_from_kv(kv: dict) -> str:
+def build_name_from_kv(kv: dict, group: str):
+    errors = []
+    
     """
     Thứ tự cố định:
     Model + CPU + RAM + SSD + HDD(if) + TPM + Display + T(if) + CAM(if) + MIC(if) + WF(if) + BT(if)
@@ -398,51 +400,50 @@ def build_name_from_kv(kv: dict) -> str:
     end_token = sales_model if sales_model else smn
     parts.append(f"({end_token})")
 
-    return "/".join(parts)
+    final_name = "/".join(parts)
+    return final_name, errors
 
 # =========================
 # Streamlit UI (Upload file)
 # =========================
-st.title("🧩 Product Name Builder")
+st.title("🧩 Product Name Builder — Specsheet 2 cột")
 
+# 🔽 Chọn nhóm sản phẩm (không chọn thì không chạy)
+group = st.selectbox(
+    "Chọn nhóm sản phẩm",
+    options=["NB", "PC", "AIO", "Server", "ACCY"],
+    index=None,  # không mặc định
+    placeholder="Chọn nhóm…"
+)
+
+# 📤 Upload file
 uploaded = st.file_uploader("Upload specsheet (.xlsx)", type=["xlsx"])
 
-if uploaded is None:
-    st.info("⬆️ Upload file Excel specsheet")
-else:
-    try:
-        # Đọc trực tiếp file upload (không dùng header vì là bảng Key|Value)
-        raw_df = pd.read_excel(uploaded, header=None)
+# ⛔️ Yêu cầu: phải có file + đã chọn nhóm
+if uploaded is None or group is None:
+    if uploaded is None:
+        st.info("⬆️ Upload file Excel specsheet")
+    if group is None:
+        st.info("🔽 Chọn nhóm sản phẩm")
+    st.stop()
 
-        # Hiển thị nhanh input để kiểm tra
-        with st.expander("👀 Xem nhanh file input"):
-            st.dataframe(raw_df)
+# ✅ Đủ điều kiện -> xử lý
+raw_df = pd.read_excel(uploaded, header=None)
+kv = _kv_map_from_specsheet(raw_df)
 
-        # Parse và build tên
-        kv = _kv_map_from_specsheet(raw_df)
-        name = build_name_from_kv(kv)
+name, errors = build_name_from_kv(kv, group=group)  # nhớ sửa chữ ký hàm nhận group và trả (name, errors)
 
-        st.subheader("✅ Kết quả")
-        st.code(name, language="text")
+st.subheader("✅ Kết quả")
+st.code(name, language="text")
+if errors:
+    st.warning("⚠️ " + " | ".join(errors))
 
-        # Cho tải Excel chứa kết quả (1 dòng)
-        out_df = pd.DataFrame({"Generated Name": [name]})
-        bio = io.BytesIO()
-        with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
-            out_df.to_excel(writer, index=False)
-        st.download_button(
-            "💾 Tải kết quả (.xlsx)",
-            data=bio.getvalue(),
-            file_name="generated_name.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+with st.expander("👀 Xem nhanh file input"):
+    st.dataframe(raw_df)
+with st.expander("🛠 Keys đã đọc (debug)"):
+    st.write(kv)
 
-        # Debug: xem các key đã nhận (để so tên dòng có khớp không)
-        with st.expander("🛠 Keys đã đọc (debug)"):
-            st.write(kv)
 
-    except Exception as e:
-        st.error(f"❌ Lỗi khi xử lý: {e}")
 
 
 
