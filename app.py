@@ -416,9 +416,12 @@ def build_name_from_kv(kv: dict, group: str):
     errors.extend(errs)
 
 
-    # 8) Touch (nếu có)
-    touch = _touch_code(_get(kv, "Touch Panel", "Touchscreen", "Touch"))
-    if touch: parts.append(touch)
+    # 8) Touch — chỉ với nhóm NB/AIO, chỉ khi key "Touch Panel" có value "Touch screen"
+    if group in {"NB", "AIO"}:
+        touch_val = _get(kv, "Touch Panel")
+        if touch_val and re.search(r"\btouch\s*screen\b", str(touch_val), flags=re.IGNORECASE):
+            parts.append("T")
+    # PC/Server/ACCY: bỏ qua Touch
 
     # 9) CAM (nếu có)
     cam = _get(kv, "Camera")
@@ -504,6 +507,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
