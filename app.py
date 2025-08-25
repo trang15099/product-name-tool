@@ -49,8 +49,10 @@ def _group_prefix(group: str) -> str:
 def simplify_battery(text: str, group: str) -> tuple[str, list]:
     """
     Chuẩn hóa Battery cho NB:
-    - Format: 3C50WHr
-    - Nếu thiếu -> N/A_Battery (NB), bỏ qua cho group khác.
+    - Format: 3C63WHr
+    - Nếu chỉ có WHr -> ?C63WHr
+    - Nếu chỉ có Cells -> 3C??WHr
+    - Nếu thiếu hoàn toàn -> N/A_Battery (NB), nhóm khác bỏ qua
     """
     errors = []
     if not text:
@@ -60,19 +62,24 @@ def simplify_battery(text: str, group: str) -> tuple[str, list]:
         return "", errors
 
     t = _to_str(text).upper()
-    # Bắt số cell
+
+    # Cells: "3-cell" hoặc "3S1P"
     m_cell = re.search(r"(\d+)\s*CELL", t)
     cells = m_cell.group(1) if m_cell else ""
+    if not cells:
+        m_alt = re.search(r"(\d+)S\d+P", t)
+        if m_alt:
+            cells = m_alt.group(1)
 
-    # Bắt dung lượng WHr
+    # WHr
     m_wh = re.search(r"(\d+)\s*WHR", t)
     wh = m_wh.group(1) if m_wh else ""
 
     if cells and wh:
         return f"{cells}C{wh}WHr", errors
-    if wh:   # có WHr mà không thấy cell
-        return f"{wh}WHr", errors
-    if cells:  # có cell mà thiếu WHr
+    if wh:   # chỉ có WHr
+        return f"?C{wh}WHr", errors
+    if cells:  # chỉ có cell
         return f"{cells}C??WHr", errors
 
     if group == "NB":
@@ -704,6 +711,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
