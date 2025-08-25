@@ -46,6 +46,40 @@ def _group_prefix(group: str) -> str:
     }
     return mapping.get(g, "")
 
+def simplify_battery(text: str, group: str) -> tuple[str, list]:
+    """
+    Chuẩn hóa Battery cho NB:
+    - Format: 3C50WHr
+    - Nếu thiếu -> N/A_Battery (NB), bỏ qua cho group khác.
+    """
+    errors = []
+    if not text:
+        if group == "NB":
+            errors.append("Thiếu Battery cho NB")
+            return "N/A_Battery", errors
+        return "", errors
+
+    t = _to_str(text).upper()
+    # Bắt số cell
+    m_cell = re.search(r"(\d+)\s*CELL", t)
+    cells = m_cell.group(1) if m_cell else ""
+
+    # Bắt dung lượng WHr
+    m_wh = re.search(r"(\d+)\s*WHR", t)
+    wh = m_wh.group(1) if m_wh else ""
+
+    if cells and wh:
+        return f"{cells}C{wh}WHr", errors
+    if wh:   # có WHr mà không thấy cell
+        return f"{wh}WHr", errors
+    if cells:  # có cell mà thiếu WHr
+        return f"{cells}C??WHr", errors
+
+    if group == "NB":
+        errors.append("Không nhận dạng được Battery cho NB")
+        return "N/A_Battery", errors
+    return "", errors
+
 
 def _extract_base_color_token(text: str) -> str:
     """
@@ -576,6 +610,12 @@ def build_name_from_kv(kv: dict, group: str):
             parts.append("PSU_N/A")
             errors.append(f"Thiếu Power Supply cho nhóm {group}")
 
+    # 10) Battery - bắt buộc cho NB
+    battery, berrs = simplify_battery(_get(kv, "Battery"), group)
+    if battery:
+        parts.append(battery)
+    errors.extend(berrs)
+
 
     # 11) WF + 12) BT (từ dòng Wireless)
     wireless = _get(kv, "Wireless", "Connectivity", "LAN/WLAN")
@@ -664,6 +704,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
