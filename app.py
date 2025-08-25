@@ -20,6 +20,91 @@ RESOLUTION_MAP = {
     "3840x2160": "4K",
 }
 
+#Color ID -> map sang tiếng Việt IN HOA có dấu
+_ALLOWED_COLOR_MAP = {
+    "BLACK": "ĐEN",
+    "WHITE": "TRẮNG",
+    "SILVER": "BẠC",
+    "GRAY": "XÁM", "GREY": "XÁM", "GRAPHITE": "XÁM", "SPACE GRAY": "XÁM",
+}
+
+# từ “trang trí/marketing” để bỏ
+_COLOR_ADJ = [
+    "STAR", "STARRY", "STARLIGHT", "QUIET", "MOONLIGHT", "MATTE", "GLOSSY",
+    "DARK", "LIGHT", "MIDNIGHT", "SPACE", "OCEAN", "FOREST", "MINT", "ICE",
+    "SKY", "DEEP", "PURE", "SNOW",
+]
+
+def _group_prefix(group: str) -> str:
+    g = (group or "").upper()
+    mapping = {
+        "NB":     "MÁY TÍNH XÁCH TAY (NB) ASUS",
+        "PC":     "MÁY TÍNH ĐỂ BÀN (PC) ASUS",
+        "AIO":    "MÁY TÍNH ĐỂ BÀN (PC) ASUS AIO",
+        "SERVER": "MÁY CHỦ (SERVER) ASUS",
+        "ACCY":   "(ACCY) ASUS",
+    }
+    return mapping.get(g, "")
+
+
+def _extract_base_color_token(text: str) -> str:
+    """
+    Trả về token màu gốc đầu tiên (BLACK/WHITE/SILVER/GRAY/BLUE/RED/...)
+    - Bỏ tính từ marketing
+    - Tách theo / , + ; & 'and'
+    """
+    t = _to_str(text).upper()
+    if not t:
+        return ""
+
+    # gom nhiều key 'color/colour' → tách thành mảnh để giữ thứ tự
+    chunks = re.split(r"[\/,+;&]|\band\b", t)
+    for raw in chunks:
+        s = raw.strip()
+        if not s:
+            continue
+        for adj in _COLOR_ADJ:
+            s = re.sub(rf"\b{re.escape(adj)}\b", " ", s)
+        s = re.sub(r"\s+", " ", s).strip()
+
+        # ưu tiên cụm 2 từ như SPACE GRAY trước
+        for k in sorted(_ALLOWED_COLOR_MAP.keys(), key=len, reverse=True):
+            if re.search(rf"\b{re.escape(k)}\b", s):
+                return k
+
+        # nếu không rơi vào allowed, vẫn cố gắng nhận BLUE/GREEN/... để ghi N/A_<COLORID>
+        m = re.search(r"\b(BLACK|WHITE|SILVER|GRAY|GREY|GRAPHITE|BLUE|GREEN|RED|ORANGE|PURPLE|VIOLET|PINK|ROSE|GOLD|BROWN)\b", s)
+        if m:
+            return m.group(1)
+
+    return ""
+
+def simplify_color_from_kv(kv: dict) -> str:
+    """
+    - Tìm value từ mọi key chứa 'color' hoặc 'colour'
+    - Lấy màu đầu tiên
+    - Nếu thuộc 4 nhóm hợp lệ -> trả VI (ĐEN/TRẮNG/BẠC/XÁM)
+    - Nếu ra màu khác -> trả 'N/A_<COLORID>' (vd N/A_BLUE)
+    - Nếu không thấy -> trả ""
+    """
+    values = []
+    for k_norm, v in kv.items():
+        if "color" in k_norm or "colour" in k_norm:
+            if _to_str(v):
+                values.append(str(v))
+    if not values:
+        return ""
+
+    token = _extract_base_color_token(" / ".join(values))
+    if not token:
+        return ""
+
+    if token in _ALLOWED_COLOR_MAP:
+        return _ALLOWED_COLOR_MAP[token]  # ĐEN/TRẮNG/BẠC/XÁM
+    else:
+        return token  # ví dụ: BLUE, GREEN, RED...
+
+
 def _to_str(x):
     if x is None or (isinstance(x, float) and pd.isna(x)):
         return ""
@@ -393,7 +478,7 @@ def build_name_from_kv(kv: dict, group: str):
     errors = []
     
     """
-    Product Name = Model + CPU + RAM + SSD + HDD(if) + TPM + Display + T(if) + WF/BT(if) + KB&M(if) + Windows (NOS if missing) + Warranty(if) + Color(if) + (Sales Model)
+    Note: chưa hoàn thiện logic HDD, wireless KB&M, battery(NB) color,GPU warranty
     """
     parts = []
 
@@ -511,8 +596,15 @@ def build_name_from_kv(kv: dict, group: str):
     if warr: parts.append(warr)
 
     # 16) Color
-    color = _get(kv, "Color", "Colour")
-    if color: parts.append(color)
+
+    # Color — key nào có COLOR/COLOUR đều lấy; chỉ chấp nhận 4 màu, còn lại -> N/A_<COLORID>
+    color_token = simplify_color_from_kv(kv)
+    if color_token:
+        parts.append(color_token)
+    else:
+        parts.append("N/A_Color")
+        errors.append("Thiếu Color")
+
 
     # 17) Sales Model (trong ngoặc) — ưu tiên "Sales Model", nếu không có thì dùng "Sales Model Name"
     sales_model = _get(kv, "Sales Model")
@@ -520,6 +612,11 @@ def build_name_from_kv(kv: dict, group: str):
     parts.append(f"({end_token})")
 
     final_name = "/".join(parts)
+
+    prefix = _group_prefix(group)
+    if prefix:
+        final_name = f"{prefix} {final_name}"
+
     return final_name, errors
 
 # =========================
@@ -567,6 +664,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
