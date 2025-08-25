@@ -46,13 +46,20 @@ def _group_prefix(group: str) -> str:
     }
     return mapping.get(g, "")
 
+import re
+
 def simplify_battery(text: str, group: str) -> tuple[str, list]:
     """
-    Chuẩn hóa Battery cho NB:
-    - Format: 3C63WHr
-    - Nếu chỉ có WHr -> ?C63WHr
-    - Nếu chỉ có Cells -> 3C??WHr
-    - Nếu thiếu hoàn toàn -> N/A_Battery (NB), nhóm khác bỏ qua
+    Battery (NB):
+    - Input ví dụ: "63WHrs, 3S1P, 3-cell Li-ion"
+    - Cells: chỉ lấy từ "N-cell" (bỏ qua SxP)
+    - WHr: chấp nhận WHr/WHrs/Wh/WH
+    - Output:
+        + cells & whr  -> "3C63WHr"
+        + only whr     -> "?C63WHr"
+        + only cells   -> "3C??WHr"
+        + thiếu (NB)   -> "N/A_Battery" + lỗi
+        + nhóm khác    -> "" (bỏ qua)
     """
     errors = []
     if not text:
@@ -63,29 +70,26 @@ def simplify_battery(text: str, group: str) -> tuple[str, list]:
 
     t = _to_str(text).upper()
 
-    # Cells: "3-cell" hoặc "3S1P"
-    m_cell = re.search(r"(\d+)\s*CELL", t)
+    # Cells: chỉ lấy từ "N-cell" (chấp nhận "3-cell" hoặc "3 cell")
+    m_cell = re.search(r"\b(\d+)\s*-?\s*CELL\b", t)
     cells = m_cell.group(1) if m_cell else ""
-    if not cells:
-        m_alt = re.search(r"(\d+)S\d+P", t)
-        if m_alt:
-            cells = m_alt.group(1)
 
-    # WHr
-    m_wh = re.search(r"(\d+)\s*WHR", t)
+    # WHr: chấp nhận WHR / WHRS / WH / WHS / Wh...
+    m_wh = re.search(r"\b(\d+)\s*WHR?S?\b", t)
     wh = m_wh.group(1) if m_wh else ""
 
     if cells and wh:
         return f"{cells}C{wh}WHr", errors
-    if wh:   # chỉ có WHr
+    if wh:
         return f"?C{wh}WHr", errors
-    if cells:  # chỉ có cell
+    if cells:
         return f"{cells}C??WHr", errors
 
     if group == "NB":
         errors.append("Không nhận dạng được Battery cho NB")
         return "N/A_Battery", errors
     return "", errors
+
 
 
 def _extract_base_color_token(text: str) -> str:
@@ -711,6 +715,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
