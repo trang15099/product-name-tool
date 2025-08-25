@@ -525,7 +525,7 @@ def build_name_from_kv(kv: dict, group: str):
 # =========================
 # Streamlit UI (Upload file)
 # =========================
-st.title("🧩 Product Name Builder — Specsheet 2 cột")
+st.title("🧩 Product Name Builder")
 
 # 🔽 Chọn nhóm sản phẩm (không chọn thì không chạy)
 group = st.selectbox(
@@ -567,6 +567,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
