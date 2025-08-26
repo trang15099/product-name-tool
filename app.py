@@ -763,7 +763,7 @@ final_name, errors = build_name_from_kv(kv, group=group)
 st.subheader("✅ Result")
 
 
-st.code(name, language="text")
+st.code(final_name, language="text")
 if errors:
     st.warning("⚠️ " + " | ".join(errors))
 
@@ -771,6 +771,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
