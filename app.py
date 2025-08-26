@@ -561,22 +561,21 @@ def build_name_from_kv(kv: dict, group: str):
     """
     parts = []
 
-    # 1) Model — phần trước '-' của "Sales Model Name" (bắt buộc)
+    # 1) Model
     smn = _get(kv, "Sales Model Name")
     if not smn:
-        raise ValueError("Thiếu 'Sales Model Name' trong specsheet.")
+        raise ValueError("Thiếu 'Sales Model Name'")
     model = smn.split("-", 1)[0].strip() if "-" in smn else smn.strip()
-    parts.append(model)
-
-    # 2) CPU
+    
+    # 2) CPU (tìm key chứa 'processor' hoặc 'on board processor')
     cpu_raw = ""
     for k, v in kv.items():
-        if "processor" in k:   # match bất kỳ key chứa chữ processor
+        if "processor" in k:            # k là key đã normalize (lowercase) của bạn
             cpu_raw = v
             break
-    if cpu_raw:
-        parts.append(simplify_cpu(cpu_raw))
-
+    cpu = simplify_cpu(cpu_raw) if cpu_raw else ""   # luôn tạo biến cpu, rỗng nếu không có
+    
+    # Ghép phần đầu
     first_segment = f"{model} {cpu}".strip()
 
     # 3) RAM
@@ -759,7 +758,7 @@ if uploaded is None:
 raw_df = pd.read_excel(uploaded, header=None)
 kv = _kv_map_from_specsheet(raw_df)
 
-name, errors = build_name_from_kv(kv, group=group)  # nhớ sửa chữ ký hàm nhận group và trả (name, errors)
+final_name, errors = build_name_from_kv(kv, group=group) 
 
 st.subheader("✅ Result")
 
@@ -772,6 +771,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
