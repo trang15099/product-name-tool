@@ -451,22 +451,39 @@ def _truthy(val: str) -> bool:
     t = _to_str(val).lower()
     return bool(t) and t not in ("no", "không", "none", "n/a", "na", "0")
 
-def _kbm_code(kb_mouse: str, included_box: str) -> str:
+
+def _kbm_code(kb_mouse: str, included_box: str, group: str) -> str:
+    """
+    PC/AIO:  KB&M | WL_KB&M
+    NB:      M | WL_M
+    Khác:    không ghi gì
+    """
     src = f"{_to_str(kb_mouse)} {_to_str(included_box)}".lower()
-    if not src.strip():
+    src = re.sub(r'["“”]', " ", src)
+    src = re.sub(r"\s+", " ", src).strip()
+    if not src:
         return ""
-    tags = []
-    # keyboard
-    if "wireless keyboard" in src:
-        tags.append("WL_KB")
-    elif "keyboard" in src:
-        tags.append("KB")
-    # mouse
-    if "wireless mouse" in src:
-        tags.append("WL_M")
-    elif "mouse" in src:
-        tags.append("M")
-    return "&".join(tags) if tags else ""
+
+    is_wireless = ("wireless" in src) or ("bluetooth" in src) or bool(
+        re.search(r"(2\.4g|2\.4 ghz)", src)
+    )
+    has_kb = ("keyboard" in src) or ("kb" in src) or ("keyboard&mouse" in src) or ("combo" in src)
+    has_m  = ("mouse" in src)
+
+    if group in {"PC", "AIO"}:
+        # chỉ xuất khi thấy dấu hiệu có bộ KB/M
+        if has_kb or has_m or "combo" in src:
+            return "WL_KB&M" if is_wireless else "KB&M"
+        return ""
+
+    if group == "NB":
+        if has_m:  # chỉ quan tâm chuột
+            return "WL_M" if is_wireless else "M"
+        return ""
+
+    # Server/ACCY: bỏ qua
+    return ""
+
 
 def _os_code(os_text: str) -> str:
     """
@@ -652,9 +669,13 @@ def build_name_from_kv(kv: dict, group: str):
     if _has_bt(wireless): parts.append("BT")
 
     # 13) KB&M (Keyboard & Mouse hoặc Included in the box)
-    kbm = _kbm_code(_get(kv, "Keyboard & Mouse", "Keyboard and Mouse"),
-                    _get(kv, "Included in the box"))
-    if kbm: parts.append(kbm)
+    kbm = _kbm_code(
+        _get(kv, "Keyboard & Mouse", "Keyboard and Mouse"),
+        _get(kv, "Included in the box"),
+        group,
+    )
+    if kbm:
+        parts.append(kbm)
 
     # 14) Windows (bắt buộc -> nếu trống => NOS)
     parts.append(_os_code(_get(kv, "Operating System")))
@@ -734,6 +755,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
