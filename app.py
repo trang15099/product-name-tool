@@ -6,7 +6,7 @@ import pandas as pd
 import io
 import re
 
-st.set_page_config(page_title="Product Name Builder", page_icon="🧩")
+st.set_page_config(page_title="Product Name", page_icon="🧩")
 
 # =========================
 # Config & Helpers
@@ -709,6 +709,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
