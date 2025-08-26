@@ -84,8 +84,6 @@ def simplify_battery(text: str, group: str) -> tuple[str, list]:
     return "", errors
 
 
-
-
 def _extract_base_color_token(text: str) -> str:
     """
     Trả về token màu gốc đầu tiên (BLACK/WHITE/SILVER/GRAY/BLUE/RED/...)
@@ -549,7 +547,6 @@ def _warranty_code_from_kv(kv: dict) -> str:
     return _warranty_code_from_text(val)
 
 
-
 # =========================
 # Core build logic
 # =========================
@@ -708,13 +705,18 @@ def build_name_from_kv(kv: dict, group: str):
     
     if body:
         if color_token:
-            # bỏ Color khỏi body (Color là phần tử cuối trong parts)
+            # body không gồm Color
             body_wo_color = "/".join(parts[:-1])
-            final_name = f"{first_segment}/" + body_wo_color + color_token + f"({end_token})"
+            if body_wo_color:
+                # có nhiều phần → thêm "/" giữa body và Color
+                final_name = f"{first_segment}/" + body_wo_color + "/" + color_token + f" ({end_token})"
+            else:
+                # chỉ có mỗi Color trong parts
+                final_name = f"{first_segment}/" + color_token + f" ({end_token})"
         else:
-            final_name = f"{first_segment}/" + body + f"({end_token})"
+            final_name = f"{first_segment}/" + body + f" ({end_token})"
     else:
-        final_name = f"{first_segment}({end_token})"
+        final_name = f"{first_segment} ({end_token})"
     
     # Prefix nhóm (NB/PC/AIO/Server/ACCY)
     prefix = _group_prefix(group)
@@ -771,6 +773,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
