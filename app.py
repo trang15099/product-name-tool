@@ -489,7 +489,7 @@ def _os_code(os_text: str) -> str:
 
     return "NOS"
 
-def _warranty_code_from_kv(txt: str) -> str:
+def _warranty_code_from_text(txt: str) -> str:
     """
     Format: ?Y-Type
     Type:
@@ -499,6 +499,7 @@ def _warranty_code_from_kv(txt: str) -> str:
     if not txt:
         return "Warranty_input"
 
+    
     t = _to_str(txt)  # giữ nguyên, dùng re.I để không phân biệt hoa/thường
 
     # years: '3Y', '3 Y', '3y'...
@@ -520,6 +521,15 @@ def _warranty_code_from_kv(txt: str) -> str:
         return f"{years}Y-PUR"
     return "Warranty_input"
 
+def _warranty_code_from_kv(kv: dict) -> str:
+    # Ưu tiên 'Base Warranty', nếu không có thì lấy dòng đầu tiên có chữ 'warranty' trong key.
+    val = _get(kv, "Base Warranty")
+    if not val:
+        for k_norm, v in kv.items():
+            if "warranty" in k_norm:
+                val = v
+                break
+    return _warranty_code_from_text(val)
 
 
 
@@ -724,6 +734,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
