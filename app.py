@@ -709,14 +709,14 @@ def build_name_from_kv(kv: dict, group: str):
             body_wo_color = "/".join(parts[:-1])
             if body_wo_color:
                 # có nhiều phần → thêm "/" giữa body và Color
-                final_name = f"{first_segment}/" + body_wo_color + "/" + color_token + f" ({end_token})"
+                final_name = f"{first_segment}/" + body_wo_color + "/" + color_token + f"({end_token})"
             else:
                 # chỉ có mỗi Color trong parts
-                final_name = f"{first_segment}/" + color_token + f" ({end_token})"
+                final_name = f"{first_segment}/" + color_token + f"({end_token})"
         else:
-            final_name = f"{first_segment}/" + body + f" ({end_token})"
+            final_name = f"{first_segment}/" + body + f"({end_token})"
     else:
-        final_name = f"{first_segment} ({end_token})"
+        final_name = f"{first_segment}({end_token})"
     
     # Prefix nhóm (NB/PC/AIO/Server/ACCY)
     prefix = _group_prefix(group)
@@ -773,6 +773,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
