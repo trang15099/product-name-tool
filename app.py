@@ -749,9 +749,10 @@ name, errors = build_name_from_kv(kv, group=group)  # nhớ sửa chữ ký hàm
 st.subheader("✅ Result")
 
 st.markdown(
-    f"<h2 style='text-align:left; color:darkblue;'>{name}</h2>",
+    f"<h2 style='text-align:center; color:darkblue;'>Dòng 1<br>Dòng 2</h2>",
     unsafe_allow_html=True
 )
+
 st.code(name, language="text")
 if errors:
     st.warning("⚠️ " + " | ".join(errors))
@@ -760,6 +761,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
