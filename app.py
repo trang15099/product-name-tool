@@ -700,24 +700,22 @@ def build_name_from_kv(kv: dict, group: str):
     # 17) Sales Model (trong ngoặc) — ưu tiên "Sales Model", nếu không có thì dùng "Sales Model Name"
     sales_model = _get(kv, "Sales Model")
     end_token = sales_model if sales_model else smn
-    parts.append(f"({end_token})")
+    #parts.append(f"({end_token})")
 
-    # Ghép kết quả: Model + CPU (first_segment) rồi đến các phần cách nhau '/'
+    # ---- Build cuối: Model + CPU (first_segment) + body + Color dính Sales Model ----
     body = "/".join(parts) if parts else ""
     
     if body:
-        if color_vi:
-            # nếu Color là phần cuối thì nối liền với Sales Model
+        if color_token:
+            # bỏ Color khỏi body (Color là phần tử cuối trong parts)
             body_wo_color = "/".join(parts[:-1])
-            final_name = (
-                f"{first_segment}/" + body_wo_color + color_vi + f"({end_token})"
-            )
+            final_name = f"{first_segment}/" + body_wo_color + color_token + f"({end_token})"
         else:
             final_name = f"{first_segment}/" + body + f"({end_token})"
     else:
         final_name = f"{first_segment}({end_token})"
     
-    # Thêm prefix nhóm sản phẩm (NB/PC/AIO/Server/ACCY)
+    # Prefix nhóm (NB/PC/AIO/Server/ACCY)
     prefix = _group_prefix(group)
     if prefix:
         final_name = f"{prefix} {final_name}"
@@ -772,6 +770,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
