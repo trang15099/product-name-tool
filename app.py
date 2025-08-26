@@ -577,6 +577,7 @@ def build_name_from_kv(kv: dict, group: str):
     if cpu_raw:
         parts.append(simplify_cpu(cpu_raw))
 
+    first_segment = f"{model} {cpu}".strip()
 
     # 3) RAM
     ram_raw = _get(kv, "Memory", "RAM", "System Memory", "Installed Memory", "DIMM Memory")
@@ -702,6 +703,7 @@ def build_name_from_kv(kv: dict, group: str):
     end_token = sales_model if sales_model else smn
     #parts.append(f"({end_token})")
 
+    
     # ---- Build cuối: Model + CPU (first_segment) + body + Color dính Sales Model ----
     body = "/".join(parts) if parts else ""
     
@@ -770,6 +772,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
