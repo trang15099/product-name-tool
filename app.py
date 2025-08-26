@@ -489,7 +489,7 @@ def _os_code(os_text: str) -> str:
 
     return "NOS"
 
-def _warranty_code_from_text(txt: str) -> str:
+def _warranty_code_from_kv(txt: str) -> str:
     """
     Format: ?Y-Type
     Type:
@@ -724,6 +724,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
