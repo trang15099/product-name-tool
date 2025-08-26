@@ -51,15 +51,8 @@ import re
 def simplify_battery(text: str, group: str) -> tuple[str, list]:
     """
     Battery (NB):
-    - Input ví dụ: "63WHrs, 3S1P, 3-cell Li-ion"
-    - Cells: chỉ lấy từ "N-cell" (bỏ qua SxP)
-    - WHr: chấp nhận WHr/WHrs/Wh/WH
-    - Output:
-        + cells & whr  -> "3C63WHr"
-        + only whr     -> "?C63WHr"
-        + only cells   -> "3C??WHr"
-        + thiếu (NB)   -> "N/A_Battery" + lỗi
-        + nhóm khác    -> "" (bỏ qua)
+    - Cells: chỉ lấy từ "N-cell" (chấp nhận: 3-cell / 3 cell / 3cell / 3 cells / 3 cell(s))
+    - WHr: chấp nhận WHr/WHrs/Wh/WH...
     """
     errors = []
     if not text:
@@ -68,20 +61,20 @@ def simplify_battery(text: str, group: str) -> tuple[str, list]:
             return "N/A_Battery", errors
         return "", errors
 
-    t = _to_str(text).upper()
+    t = _to_str(text)
 
-    # Cells: chỉ lấy từ "N-cell" (chấp nhận "3-cell" hoặc "3 cell")
-    m_cell = re.search(r"\b(\d+)\s*-?\s*CELL\b", t)
+    # Cells: linh hoạt hơn
+    m_cell = re.search(r"\b(\d+)\s*-?\s*cell(?:s|\(s\))?\b", t, flags=re.IGNORECASE)
     cells = m_cell.group(1) if m_cell else ""
 
-    # WHr: chấp nhận WHR / WHRS / WH / WHS / Wh...
-    m_wh = re.search(r"\b(\d+)\s*WHR?S?\b", t)
-    wh = m_wh.group(1) if m_wh else ""
+    # WHr: linh hoạt hơn + chuẩn hoá
+    m_wh = re.search(r"\b(\d{2,4})\s*W\s*H(?:\s*R)?(?:s)?\b", t, flags=re.IGNORECASE)
+    wh = f"{int(m_wh.group(1))}WHr" if m_wh else ""
 
     if cells and wh:
-        return f"{cells}C{wh}WHr", errors
+        return f"{cells}C{wh}", errors
     if wh:
-        return f"?C{wh}WHr", errors
+        return f"?C{wh}", errors
     if cells:
         return f"{cells}C??WHr", errors
 
@@ -89,6 +82,7 @@ def simplify_battery(text: str, group: str) -> tuple[str, list]:
         errors.append("Không nhận dạng được Battery cho NB")
         return "N/A_Battery", errors
     return "", errors
+
 
 
 
@@ -715,6 +709,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
