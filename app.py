@@ -490,25 +490,58 @@ def _os_code(os_text: str) -> str:
     return "NOS"
 
 
-def _warranty_code(w_text: str) -> str:
-    t = _to_str(w_text).lower()
-    if not t:
-        return ""
-    # năm
-    m_year = re.search(r"(\d+)\s*(year|years|y)\b", t)
-    year = f"{m_year.group(1)}Y" if m_year else ""
-    # fallback: tháng
-    if not year:
-        m_month = re.search(r"(\d+)\s*(month|months|m)\b", t)
-        if m_month:
-            n = int(m_month.group(1))
-            year = f"{max(1, round(n/12))}Y"
-    wtype = ""
-    if "on site" in t or "onsite" in t or "on-site" in t:
-        wtype = "OSS"
-    elif "pur" in t:
-        wtype = "PUR"
-    return f"{year}-{wtype}" if (year and wtype) else ""
+
+def _warranty_code_from_text(txt: str) -> str:
+    """
+    Format: ?Y-Type
+    Type:
+      - Onsite / On-site / On site / on_site / OSS  -> OSS
+      - PUR / Pick up and return (mọi biến thể)      -> PUR
+    Nếu không nhận ra type -> 'Warranty_input'
+    """
+    if not txt:
+        return "Warranty_input"
+
+    t = _to_str(txt).upper()
+
+    # years: lấy số trước Y (1Y, 3 Y, 5y…); nếu không thấy -> '?'
+    m_year = re.search(r"(\d+)\s*Y\b", t)
+    years = m_year.group(1) if m_year else "?"
+
+    # chuẩn hoá để nhận diện type
+    # onsite: cho phép khoảng trắng, gạch nối, underscore; hoặc OSS
+    is_onsite = bool(
+        re.search(r"\bon[\s\-_]*site\b", t) or
+        re.search(r"\boss\b", t)
+    )
+
+    # PUR: chữ PUR hoặc "pick up and return" với khoảng trắng/gạch/underscore linh hoạt
+    is_pur = bool(
+        re.search(r"\bPUR\b", t) or
+        re.search(r"\bpick[\s\-_]*up[\s\-_]*and[\s\-_]*return\b", t)
+    )
+
+    if is_onsite:
+        return f"{years}Y-OSS"
+    if is_pur:
+        return f"{years}Y-PUR"
+
+    return "Warranty_input"
+
+
+def _warranty_code_from_kv(kv: dict) -> str:
+    """
+    Tìm 'Base Warranty', nếu không có thì lấy dòng đầu tiên có chữ 'warranty' trong key.
+    """
+    # ưu tiên 'Base Warranty'
+    val = _get(kv, "Base Warranty")
+    if not val:
+        for k_norm, v in kv.items():
+            if "warranty" in k_norm:
+                val = v
+                break
+    return _warranty_code_from_text(val)
+
 
 # =========================
 # Core build logic
@@ -517,7 +550,7 @@ def build_name_from_kv(kv: dict, group: str):
     errors = []
     
     """
-    Note: chưa hoàn thiện logic HDD, wireless KB&M, battery(NB) color,GPU warranty
+    Note: chưa hoàn thiện logic HDD, wireless KB&M,GPU warranty
     """
     parts = []
 
@@ -637,8 +670,10 @@ def build_name_from_kv(kv: dict, group: str):
     parts.append(_os_code(_get(kv, "Operating System")))
 
     # 15) Warranty
-    warr = _warranty_code(_get(kv, "Warranty", "Service"))
-    if warr: parts.append(warr)
+    warr = _warranty_code_from_kv(kv)
+    if warr:
+        parts.append(warr)
+
 
     # 16) Color
 
@@ -682,7 +717,7 @@ group = st.selectbox(
 #if uploaded is None or group is None:
 if group is None:
     if group is None:
-        st.info("🔽⬆️ Chọn nhóm sản phẩm hehe")
+        st.info("🔽⬆️ Chọn nhóm sản phẩm")
     
     st.stop()
 
@@ -709,6 +744,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
