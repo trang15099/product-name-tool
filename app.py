@@ -489,58 +489,38 @@ def _os_code(os_text: str) -> str:
 
     return "NOS"
 
-
-
 def _warranty_code_from_text(txt: str) -> str:
     """
     Format: ?Y-Type
     Type:
       - Onsite / On-site / On site / on_site / OSS  -> OSS
-      - PUR / Pick up and return (mọi biến thể)      -> PUR
-    Nếu không nhận ra type -> 'Warranty_input'
+      - PUR / Pick up and return                    -> PUR
     """
     if not txt:
         return "Warranty_input"
 
-    t = _to_str(txt).upper()
+    t = _to_str(txt)  # giữ nguyên, dùng re.I để không phân biệt hoa/thường
 
-    # years: lấy số trước Y (1Y, 3 Y, 5y…); nếu không thấy -> '?'
-    m_year = re.search(r"(\d+)\s*Y\b", t)
+    # years: '3Y', '3 Y', '3y'...
+    m_year = re.search(r"(\d+)\s*Y\b", t, flags=re.I)
     years = m_year.group(1) if m_year else "?"
 
-    # chuẩn hoá để nhận diện type
-    # onsite: cho phép khoảng trắng, gạch nối, underscore; hoặc OSS
     is_onsite = bool(
-        re.search(r"\bon[\s\-_]*site\b", t) or
-        re.search(r"\boss\b", t)
+        re.search(r"\bon[\s\-_]*site\b", t, flags=re.I) or
+        re.search(r"\boss\b", t, flags=re.I)
     )
-
-    # PUR: chữ PUR hoặc "pick up and return" với khoảng trắng/gạch/underscore linh hoạt
     is_pur = bool(
-        re.search(r"\bPUR\b", t) or
-        re.search(r"\bpick[\s\-_]*up[\s\-_]*and[\s\-_]*return\b", t)
+        re.search(r"\bPUR\b", t, flags=re.I) or
+        re.search(r"\bpick[\s\-_]*up[\s\-_]*and[\s\-_]*return\b", t, flags=re.I)
     )
 
     if is_onsite:
         return f"{years}Y-OSS"
     if is_pur:
         return f"{years}Y-PUR"
-
     return "Warranty_input"
 
 
-def _warranty_code_from_kv(kv: dict) -> str:
-    """
-    Tìm 'Base Warranty', nếu không có thì lấy dòng đầu tiên có chữ 'warranty' trong key.
-    """
-    # ưu tiên 'Base Warranty'
-    val = _get(kv, "Base Warranty")
-    if not val:
-        for k_norm, v in kv.items():
-            if "warranty" in k_norm:
-                val = v
-                break
-    return _warranty_code_from_text(val)
 
 
 # =========================
@@ -744,6 +724,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
