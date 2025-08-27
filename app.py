@@ -389,6 +389,16 @@ def simplify_display(panel: str, res: str, group: str) -> tuple[str, list]:
     elif not panel_val and res_val:
         return f"N/A{res_val}", errors
 
+def has_fingerprint(kv: dict) -> bool:
+    """Trả về True nếu specsheet có Finger Print/Fingerprint với value chứa 'Support'."""
+    val = _get(kv, "Finger Print", "Fingerprint")
+    return "support" in val.lower() if val else False
+
+def has_numpad(kv: dict) -> bool:
+    """Trả về True nếu specsheet có Number Pad/NumberPad với value chứa 'Support'."""
+    val = _get(kv, "Number Pad", "NumberPad")
+    return "support" in val.lower() if val else False
+
 
 def _wifi_code(wireless: str) -> str:
     t = _to_str(wireless).upper()
@@ -621,7 +631,6 @@ def build_name_from_kv(kv: dict, group: str):
         parts.append(display)
     errors.extend(errs)
 
-
     # 8) Touch — chỉ với nhóm NB/AIO, value "Touch screen"
     if group in {"NB", "AIO"}:
         touch_val = _get(kv, "Touch Panel")
@@ -636,6 +645,15 @@ def build_name_from_kv(kv: dict, group: str):
                 parts.append("T")
     # PC/Server/ACCY: bỏ qua Touch
 
+    # Finger Print
+    if has_fingerprint(kv):
+        parts.append("FP")
+    
+    #  Number Pad
+    if has_numpad(kv):
+        parts.append("num-pad")
+
+    
     # 9) CAM & MIC — auto cho AIO
     if group == "AIO":
         parts.append("CAM")
@@ -773,6 +791,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
