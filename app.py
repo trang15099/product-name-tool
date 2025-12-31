@@ -217,13 +217,12 @@ def simplify_cpu(text: str) -> str:
     # Rule AMD Ryzen: "AMD Ryzen™ 7 260" -> "R7-260"
     m_amd = re.search(
         r"""
-        AMD\s*                     # AMD
-        Ryzen\s*(?:™\s*)?          # Ryzen + optional ™
-        (?P<tier>\d+)              # 5 / 7 / 9
-        \s*(?:Processor\s*)?       # optional Processor
-        (?P<sku>\d{3})             # 260
+        AMD\s*Ryzen\s*            # AMD Ryzen
+        (?P<tier>\d+)             # 5 / 7 / 9
+        \s*(?:Processor\s*)?      # optional 'Processor'
+        (?P<sku>\d{3})            # 260
         """,
-        s,
+        t,                        # <-- sửa từ s thành t
         re.IGNORECASE | re.VERBOSE,
     )
     if m_amd:
@@ -806,6 +805,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
