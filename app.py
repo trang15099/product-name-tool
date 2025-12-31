@@ -205,9 +205,9 @@ def simplify_cpu(text: str) -> str:
         return m.group(1)
 
     # Rule 2: Core Ultra
-    m2 = re.search(r"Ultra\s*(\d+)\s*([0-9]{3}[A-Za-z0-9]*)", t, re.I)
-    if m2:
-        return f"Ultra {m2.group(1)}-{m2.group(2)}"
+    m0 = re.search(r"Core\s*™?\s*Ultra\s*(\d+)\s*(?:Processor\s*)?([0-9]{3}[A-Za-z0-9]*)", t, re.I)
+    if m0:
+        return f"U{m0.group(1)}-{m0.group(2)}"
 
     # Rule 3: Core (chỉ số thế hệ, không có i, không Ultra)
     m3 = re.search(r"Core\s+(\d+)\s*Processor\s*([0-9]{3}[A-Za-z0-9]*)", t, re.I)
@@ -791,6 +791,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
