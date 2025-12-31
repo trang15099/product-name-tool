@@ -214,6 +214,21 @@ def simplify_cpu(text: str) -> str:
     if m3:
         return f"Core {m3.group(1)}-{m3.group(2)}"
 
+    # Rule AMD Ryzen: "AMD Ryzen™ 7 260" -> "R7-260"
+    m_amd = re.search(
+        r"""
+        AMD\s*                     # AMD
+        Ryzen\s*(?:™\s*)?          # Ryzen + optional ™
+        (?P<tier>\d+)              # 5 / 7 / 9
+        \s*(?:Processor\s*)?       # optional Processor
+        (?P<sku>\d{3})             # 260
+        """,
+        s,
+        re.IGNORECASE | re.VERBOSE,
+    )
+    if m_amd:
+        return f"R{m_amd.group('tier')}-{m_amd.group('sku')}"
+    
     # fallback: giữ nguyên
     return t
 
@@ -791,6 +806,7 @@ with st.expander("👀 Xem nhanh file input"):
     st.dataframe(raw_df)
 with st.expander("🛠 Keys đã đọc (debug)"):
     st.write(kv)
+
 
 
 
